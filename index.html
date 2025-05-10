@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --primary-100: #FF7F50;
+      --primary-200: #dd6236;
+      --primary-300: #8f1e00;
+      --accent-100: #8B4513;
+      --accent-200: #ffd299;
+      --text-100: #000000;
+      --text-200: #2c2c2c;
+      --bg-100: #F7EEDD;
+      --bg-200: #ede4d3;
+      --bg-300: #c4bcab;
+    }
+    body {
+      background: var(--bg-100);
+      font-family: Arial;
+      margin: 0;
+      padding: 0;
+    }
+    .search-bar {
+      background: var(--primary-100);
+      padding: 15px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    #search {
+      width: 80%;
+      padding: 10px;
+      border: none;
+      border-radius: 20px;
+    }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      padding: 15px;
+    }
+    .gallery img {
+      width: 100%;
+      border: 3px solid var(--accent-100);
+      border-radius: 8px;
+      aspect-ratio: 1/1;
+      object-fit: cover;
+      cursor: pointer;
+      transition: transform 0.3s;
+    }
+    .gallery img:hover {
+      transform: scale(1.03);
+    }
+    .gallery p {
+      text-align: center;
+      margin: 5px 0;
+      color: var(--text-200);
+    }
+    .upload-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--primary-100);
+      color: white;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      border: none;
+      cursor: pointer;
+      z-index: 100;
+    }
+    .upload-form {
+      display: none;
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      background: var(--bg-200);
+      padding: 15px;
+      border-radius: 10px;
+      width: 250px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 99;
+    }
+    .upload-form input, .upload-form button {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      border: 1px solid var(--bg-300);
+      border-radius: 5px;
+    }
+    .upload-form button {
+      background: var(--primary-200);
+      color: white;
+      border: none;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    /* أنماط العرض المكبر */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.9);
+      overflow: auto;
+    }
+    .modal-content {
+      display: block;
+      max-width: 95%;
+      max-height: 95%;
+      margin: auto;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation: zoom 0.3s;
+    }
+    @keyframes zoom {
+      from {transform: translate(-50%, -50%) scale(0.9)}
+      to {transform: translate(-50%, -50%) scale(1)}
+    }
+    .close {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      color: white;
+      font-size: 40px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .image-code {
+      color: white;
+      text-align: center;
+      margin-top: 20px;
+      font-size: 18px;
+    }
+    /* أنماط زر الحذف الجديدة */
+    .gallery-item {
+      position: relative;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      background: var(--primary-200);
+      color: white;
+      border: none;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 10;
+    }
+    .gallery-item:hover .delete-btn {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="search-bar">
+    <input type="text" id="search" placeholder="🔍 ابحث بكود الصورة...">
+  </div>
+  
+  <div class="gallery" id="gallery"></div>
+  
+  <button class="upload-btn" onclick="toggleForm()">+</button>
+  
+  <div class="upload-form" id="uploadForm">
+    <h3 style="margin-top:0;">رفع صورة جديدة</h3>
+    <input type="file" id="image-upload" accept="image/*">
+    <input type="text" id="image-code" placeholder="أدخل كود الصورة">
+    <button onclick="uploadImage()">رفع الصورة</button>
+  </div>
+
+  <!-- نافذة العرض المكبر -->
+  <div id="imageModal" class="modal">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <img class="modal-content" id="expandedImage">
+    <div class="image-code" id="modalCode"></div>
+  </div>
+
+  <script>
+    // تخزين الصور
+    let images = JSON.parse(localStorage.getItem('galleryImages')) || [];
+    
+    // عرض الصور مع زر الحذف
+    function displayImages() {
+      const gallery = document.getElementById("gallery");
+      gallery.innerHTML = images.map((img, index) => `
+        <div class="gallery-item">
+          <button class="delete-btn" onclick="deleteImage(${index})">×</button>
+          <img src="${img.url}" alt="صورة ${img.code}" data-code="${img.code}">
+          <p>${img.code}</p>
+        </div>
+      `).join("");
+      setupImageZoom();
+    }
+    
+    // تبديل نموذج الرفع
+    function toggleForm() {
+      const form = document.getElementById("uploadForm");
+      form.style.display = form.style.display === "block" ? "none" : "block";
+    }
+    
+    // رفع الصورة
+    function uploadImage() {
+      const file = document.getElementById("image-upload").files[0];
+      const code = document.getElementById("image-code").value;
+      
+      if (!file || !code) {
+        alert("الرجاء اختيار صورة وإدخال الكود");
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        images.unshift({ code, url: e.target.result });
+        localStorage.setItem('galleryImages', JSON.stringify(images));
+        displayImages();
+        document.getElementById("uploadForm").style.display = "none";
+        document.getElementById("image-upload").value = "";
+        document.getElementById("image-code").value = "";
+      }
+      reader.readAsDataURL(file);
+    }
+    
+    // بحث الصور
+    document.getElementById("search").addEventListener("input", (e) => {
+      const term = e.target.value.toLowerCase();
+      const filtered = images.filter(img => img.code.includes(term));
+      document.getElementById("gallery").innerHTML = filtered.map((img, index) => `
+        <div class="gallery-item">
+          <button class="delete-btn" onclick="deleteImage(${images.findIndex(i => i.code === img.code)})">×</button>
+          <img src="${img.url}" alt="صورة ${img.code}" data-code="${img.code}">
+          <p>${img.code}</p>
+        </div>
+      `).join("");
+      setupImageZoom();
+    });
+    
+    // تكبير الصورة
+    function setupImageZoom() {
+      const galleryImages = document.querySelectorAll('.gallery img');
+      const modal = document.getElementById("imageModal");
+      const modalImg = document.getElementById("expandedImage");
+      const modalCode = document.getElementById("modalCode");
+      
+      galleryImages.forEach(img => {
+        img.addEventListener('click', () => {
+          modal.style.display = "block";
+          modalImg.src = img.src;
+          modalCode.textContent = img.dataset.code;
+        });
+      });
+    }
+    
+    // إغلاق النافذة المكبرة
+    function closeModal() {
+      document.getElementById("imageModal").style.display = "none";
+    }
+    
+    // دالة حذف الصورة الجديدة
+    function deleteImage(index) {
+      if (confirm("هل أنت متأكد من حذف هذه الصورة؟")) {
+        images.splice(index, 1);
+        localStorage.setItem('galleryImages', JSON.stringify(images));
+        displayImages();
+      }
+    }
+    
+    // إغلاق النافذة عند النقر خارجها
+    window.addEventListener('click', (e) => {
+      if (e.target === document.getElementById("imageModal")) {
+        closeModal();
+      }
+      if (!document.getElementById("uploadForm").contains(e.target) && e.target !== document.querySelector(".upload-btn")) {
+        document.getElementById("uploadForm").style.display = "none";
+      }
+    });
+    
+    // التحميل الأولي
+    displayImages();
+  </script>
+</body>
+</html>
